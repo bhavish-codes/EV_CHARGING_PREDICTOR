@@ -1,5 +1,7 @@
-data/
-models/*.pkl
+data/*
+!data/raw/UrbanEVDataset/UrbanEVDataset/20220901-20230228_zone-cleaned-aggregated/station_information.csv
+models/*
+!models/rf_demand.pkl
 __pycache__/
 *.pyc
 .DS_Store
@@ -10,3 +12,4 @@ venv/
 .gemini/
 .streamlit/
 binary_data/
+
