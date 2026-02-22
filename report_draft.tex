@@ -1,0 +1,50 @@
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+
+\title{Intelligent EV Charging Demand Prediction and Agentic Infrastructure Planning System}
+\author{Team EV-ChargePlan AI}
+\date{February 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This report details the design and implementation of an AI-driven system for predicting electric vehicle (EV) charging demand and generating infrastructure expansion recommendations. Leveraging the UrbanEV benchmark dataset, we develop a Random Forest regression model for demand forecasting and integrate it into a stateful LangGraph agentic workflow. The final system provides a Streamlit-based interface for visualizing load patterns and generating automated planning reports.
+\end{abstract}
+
+\section{Introduction}
+As the global adoption of electric vehicles accelerates, urban charging infrastructure faces significant load management challenges. This project aims to bridge the gap between historical data analysis and proactive urban planning using an Agentic AI approach.
+
+\section{Methodology}
+
+\subsection{Data Preprocessing}
+The system utilizes the UrbanEV dataset, featuring 5-minute interval charging sessions from 1,600 stations in Shenzhen, China. Data was aggregated to hourly intervals, and features such as hour-of-day, day-of-week, and pricing metrics were engineered.
+
+\subsection{Demand Prediction Model}
+A Random Forest Regressor was selected for its robustness in handling non-linear time-series features. 
+\begin{equation}
+\hat{y} = \frac{1}{N} \sum_{i=1}^{B} T_i(x)
+\end{equation}
+The model achieved a Mean Absolute Error (MAE) of 7.35 kWh.
+
+\subsection{Agentic AI Architecture}
+The system employs a state-managed workflow using LangGraph. The agent consists of three primary nodes:
+\begin{itemize}
+    \item \textbf{Data Interpreter}: Analyzes ML forecasts for bottleneck detection.
+    \item \textbf{Policy Retriever}: Simulates RAG to fetch infrastructure guidelines.
+    \item \textbf{Recommendation Generator}: Synthesizes insights into actionable plans.
+\end{itemize}
+
+\section{Results}
+The Streamlit dashboard allows users to visualize station capacities and predict future demand cycles. The Agentic Planning Assistant successfully generates PDF reports recommending station upgrades for locations exceeding 80\% occupancy.
+
+\section{Conclusion}
+The proposed system demonstrates the efficacy of combining traditional ML with Agentic AI for infrastructure optimization. Future work involves integrating real-time weather data and multi-location load balancing.
+
+\end{document}

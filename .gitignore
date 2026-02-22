@@ -1,0 +1,12 @@
+data/
+models/*.pkl
+__pycache__/
+*.pyc
+.DS_Store
+.venv/
+env/
+venv/
+.env
+.gemini/
+.streamlit/
+binary_data/
