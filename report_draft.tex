@@ -10,22 +10,21 @@
 \author{Project Lead}
 \date{February 2026}
 
-
 \begin{document}
 
 \maketitle
 
 \begin{abstract}
-This report details the design and implementation of an AI-driven system for predicting electric vehicle (EV) charging demand and generating infrastructure expansion recommendations. Leveraging the UrbanEV benchmark dataset, we develop a Random Forest regression model for demand forecasting and integrate it into a stateful LangGraph agentic workflow. The final system provides a Streamlit-based interface for visualizing load patterns and generating automated planning reports.
+This report details the design and implementation of an AI-driven system for predicting electric vehicle (EV) charging demand. Leveraging the UrbanEV benchmark dataset, we develop a Random Forest regression model for demand forecasting. The final system provides a Streamlit-based interface for visualizing load patterns and exploring demand forecasts.
 \end{abstract}
 
 \section{Introduction}
-As the global adoption of electric vehicles accelerates, urban charging infrastructure faces significant load management challenges. This project aims to bridge the gap between historical data analysis and proactive urban planning using an Agentic AI approach.
+As the global adoption of electric vehicles accelerates, urban charging infrastructure faces significant load management challenges. This project focuses on historical data analysis and demand forecasting to assist in infrastructure optimization.
 
 \section{Methodology}
 
 \subsection{Data Preprocessing}
-The system utilizes the UrbanEV dataset, featuring 5-minute interval charging sessions from 1,600 stations in Shenzhen, China. Data was aggregated to hourly intervals, and features such as hour-of-day, day-of-week, and pricing metrics were engineered.
+The system utilizes the UrbanEV dataset, featuring 5-minute interval charging sessions from stations in Shenzhen, China. Data was aggregated to hourly intervals, and features such as hour-of-day, day-of-week, and pricing metrics were engineered.
 
 \subsection{Demand Prediction Model}
 A Random Forest Regressor was selected for its robustness in handling non-linear time-series features. 
@@ -34,18 +33,10 @@ A Random Forest Regressor was selected for its robustness in handling non-linear
 \end{equation}
 The model achieved a Mean Absolute Error (MAE) of 7.35 kWh.
 
-\subsection{Agentic AI Architecture}
-The system employs a state-managed workflow using LangGraph. The agent consists of three primary nodes:
-\begin{itemize}
-    \item \textbf{Data Interpreter}: Analyzes ML forecasts for bottleneck detection.
-    \item \textbf{Policy Retriever}: Simulates RAG to fetch infrastructure guidelines.
-    \item \textbf{Recommendation Generator}: Synthesizes insights into actionable plans.
-\end{itemize}
-
 \section{Results}
-The Streamlit dashboard allows users to visualize station capacities and predict future demand cycles. The Agentic Planning Assistant successfully generates PDF reports recommending station upgrades for locations exceeding 80\% occupancy.
+The Streamlit dashboard allows users to visualize station locations and predict future demand cycles based on user-defined parameters such as time and pricing.
 
 \section{Conclusion}
-The proposed system demonstrates the efficacy of combining traditional ML with Agentic AI for infrastructure optimization. Future work involves integrating real-time weather data and multi-location load balancing.
+The proposed system demonstrates the efficacy of using Random Forest models for charging demand optimization. Future work involves integrating geographic expansion recommendations and real-time load balancing.
 
 \end{document}

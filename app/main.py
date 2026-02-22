@@ -29,7 +29,7 @@ stations = load_station_info()
 
 st.title("Intelligent EV Charging Demand Prediction")
 st.sidebar.header("Navigation")
-page = st.sidebar.radio("Go to", ["Dashboard", "Demand Forecasting", "Infrastructure Planning", "About"])
+page = st.sidebar.radio("Go to", ["Dashboard", "Demand Forecasting", "About"])
 
 if page == "Dashboard":
     st.subheader("Station Network Overview")
@@ -83,64 +83,14 @@ elif page == "Demand Forecasting":
                      title=f"Predicted Demand Cycle for {day_of_week}")
         st.plotly_chart(fig, use_container_width=True)
 
-elif page == "Infrastructure Planning":
-    st.subheader("Automated Infrastructure Planning")
-    st.markdown("This module analyzes charging demand patterns to generate structured growth recommendations.")
-    
-    if st.button("Generate Planning Analysis"):
-        with st.spinner("Analyzing demand patterns..."):
-            try:
-                # Prepare summary statistics for the planner
-                demand_summary = "Peak demand of 25.4 kWh observed between 5 PM and 8 PM on weekdays. Current station capacity is reaching 85% occupancy during peak windows."
-                
-                from app.agent import build_agent_graph
-                planner = build_agent_graph()
-                initial_state = {
-                    "demand_summary": demand_summary,
-                    "hot_zones": ["Shenzhen District TAZ 559"],
-                    "guidelines": "",
-                    "recommendations": "",
-                    "history": []
-                }
-                
-                result = planner.invoke(initial_state)
-                
-                st.success("Analysis Complete")
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.info("Demand Insights")
-                    st.write(result['demand_summary'])
-                    st.write("**Identified Priority Zones:**")
-                    for zone in result['hot_zones']:
-                        st.write(f"- {zone}")
-                
-                with col2:
-                    st.info("Recommendations")
-                    st.write(result['recommendations'])
-                
-                from app.report import generate_pdf_report
-                report_path = generate_pdf_report(result['demand_summary'], result['recommendations'])
-                
-                with open(report_path, "rb") as f:
-                    st.download_button(
-                        label="Download Planning Report (PDF)",
-                        data=f,
-                        file_name="EV_Planning_Report.pdf",
-                        mime="application/pdf"
-                    )
-            except Exception as e:
-                st.error(f"Error during planning analysis: {e}")
-
 elif page == "About":
 
     st.markdown("""
     ### Project Objective
-    Design and implement an analytics system that predicts EV charging demand using historical data and generates structured planning recommendations for infrastructure expansion.
+    Design and implement an analytics system that predicts EV charging demand using historical data.
     
     ### Tech Stack
     - **ML Framework**: Scikit-learn (Random Forest)
     - **Dashboard**: Streamlit, Plotly
     - **Dataset**: UrbanEV Dataset (Open Benchmark)
     """)
-
-

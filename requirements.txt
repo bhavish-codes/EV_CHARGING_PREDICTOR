@@ -5,10 +5,6 @@ xgboost
 streamlit
 plotly
 pydeck
-langgraph
-langchain
-langchain-huggingface
-fpdf2
 statsmodels
 python-dotenv
 requests
