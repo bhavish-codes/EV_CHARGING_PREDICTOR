@@ -48,28 +48,29 @@ def train():
 
     full_df = pd.concat(all_data, ignore_index=True)
     
-    # Features and Target
+    # Features: Hour, Day, Weekend Flag, and Pricing Metrics
     X = full_df[['hour', 'day_of_week', 'is_weekend', 's_price', 'e_price']]
     y = full_df['volume']
     
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     
-    print("Training Random Forest model...")
+    print("Fitting Random Forest Regressor...")
     model = RandomForestRegressor(n_estimators=100, max_depth=10, random_state=42)
     model.fit(X_train, y_train)
     
-    # Evaluation
+    # Run evaluation metrics
     preds = model.predict(X_test)
     mae = mean_absolute_error(y_test, preds)
     rmse = np.sqrt(mean_squared_error(y_test, preds))
     
-    print(f"Model trained. MAE: {mae:.4f}, RMSE: {rmse:.4f}")
+    print(f"Training complete. MAE: {mae:.2f}, RMSE: {rmse:.2f}")
     
-    # Save
+    # Export model to disk
     os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
     with open(MODEL_PATH, "wb") as f:
         pickle.dump(model, f)
-    print(f"Model saved to {MODEL_PATH}")
+    print(f"Model exported to {MODEL_PATH}")
+
 
 
 if __name__ == "__main__":

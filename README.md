@@ -1,67 +1,64 @@
-# EV-ChargePlan AI: Intelligent EV Charging Demand Prediction & Planning System
+# EV Charging Planner: Demand Prediction & Infrastructure System
 
-An AI-driven analytics system that predicts electric vehicle (EV) charging demand and provides agentic recommendations for infrastructure planning.
+An analytics system that predicts electric vehicle (EV) charging demand and provides automated recommendations for infrastructure planning.
 
-## 🚀 Overview
-This project solves the challenge of urban EV infrastructure planning by:
-1.  **Predicting Demand**: Using historical session data from the UrbanEV dataset (Shenzhen) to forecast hourly load.
-2.  **Agentic Planning**: Utilizing a LangGraph-based AI assistant to analyze load patterns and suggest station expansions.
-3.  **Interactive Visualization**: A Streamlit dashboard for real-time monitoring and reporting.
+## Overview
+This project addresses urban EV infrastructure challenges by:
+1.  **Predicting Demand**: Forecasting hourly load using historical session data.
+2.  **Infrastructure Planning**: Analyzing load patterns to suggest station expansions and efficiency improvements.
+3.  **Visualization**: An interactive dashboard for monitoring and generating planning reports.
 
-## 🛠️ Tech Stack
-- **Dashboard**: Streamlit, Plotly, Pydeck
-- **Machine Learning**: Scikit-Learn (Random Forest Regressor)
-- **Agentic AI**: LangGraph, LangChain
+## Tech Stack
+- **Dashboard**: Streamlit, Plotly
+- **Machine Learning**: Scikit-Learn
+- **System Logic**: LangGraph
 - **Reporting**: FPDF2
-- **Data**: UrbanEV Dataset (Dryad)
+- **Data**: UrbanEV Dataset (Open Benchmark)
 
-## 📦 Project Structure
+## Project Structure
 ```text
 .
 ├── app/
-│   ├── main.py          # Main Streamlit Application
-│   ├── agent.py         # LangGraph Agent logic
-│   ├── preprocess.py    # Data cleaning & engineering
-│   ├── model.py         # Model training/loading utilities
-│   └── report.py        # PDF generation logic
-├── data/                # Raw and processed datasets
-├── models/              # Trained ML models (.pkl)
-├── requirements.txt     # Python dependencies
-├── setup.sh             # Environment setup script
-└── train_model.py       # ML Training pipeline
+│   ├── main.py          # Dashboard Application
+│   ├── agent.py         # Planning Logic
+│   ├── preprocess.py    # Data Engineering
+│   ├── model.py         # Model Utilities
+│   └── report.py        # PDF Generation
+├── data/                # Station Metadata
+├── models/              # Trained Model
+├── requirements.txt     # Dependencies
+├── setup.sh             # Setup Script
+└── train_model.py       # Training Pipeline
 ```
 
-## ⚙️ Setup & Installation
+## Setup & Installation
 
 ### Prerequisites
 - Python 3.9+
 - pip3
 
 ### Installation
-1.  Clone the repository:
+1.  **Clone the repository**:
     ```bash
-    git clone <your-repo-link>
+    git clone https://github.com/bhavish-codes/EV_CHARGING_PREDICTOR.git
     cd ev.project
     ```
-2.  Run the setup script:
+2.  **Run the setup script**:
     ```bash
     chmod +x setup.sh
     ./setup.sh
     ```
 
-## 📈 Milestone 1: ML Prediction
-- **Input**: Charging timestamps, session volume, pricing, and time features.
-- **Model**: Random Forest Regressor.
-- **Metrics**: MAE: 7.35 | RMSE: 11.66.
+## Accessing the Dashboard
+Once the setup is complete, launch the dashboard using the following command:
+```bash
+streamlit run app/main.py
+```
+By default, the application will be accessible at:
+- **Local URL**: http://localhost:8501
+- **Network URL**: http://your-ip-address:8501
 
-## 🤖 Milestone 2: Agentic Assistant
-The assistant analyzes "Hot Zones" (zones with >85% occupancy) and cross-references them with urban planning guidelines to suggest:
-- Optimal number of new fast-charging piles.
-- Transformer capacity increases.
-- Load-balancing strategies (dynamic pricing).
+## Methodology
+- **Model**: Random Forest Regressor trained on seasonal charging patterns.
+- **Planner**: Automated decision-making based on occupancy thresholds and urban planning guidelines.
 
-## 📄 Final Deliverables
-- [x] Streamlit Hosted Link
-- [x] LaTeX Project Report
-- [x] Walkthrough Video
-- [x] GitHub Repository

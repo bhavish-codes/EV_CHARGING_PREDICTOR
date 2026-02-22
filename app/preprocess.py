@@ -34,5 +34,5 @@ def engineer_features(df):
     return df
 
 if __name__ == "__main__":
-    # Example usage (will be refined after unzip)
-    print("Preprocessing script ready.")
+    pass
+

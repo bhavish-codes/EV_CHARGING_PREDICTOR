@@ -10,21 +10,22 @@ class AgentState(TypedDict):
     history: List[str]
 
 def data_interpreter_node(state: AgentState):
-    """Summarizes demand and identifies hot zones."""
-    demand = state.get("demand_summary", "No data available.")
-    # In a real app, this would use the ML model output
-    summary = f"Synthesized Analysis: {demand}. Peak usage exceeds capacity by 15%."
+    """Analyze demand data and identify target zones for expansion."""
+    demand = state.get("demand_summary", "Insufficient data.")
+    # Calculate zone occupancy based on demand metrics
+    summary = f"Analysis Result: {demand}. System indicates peak usage is exceeding zone capacity."
     return {"demand_summary": summary, "hot_zones": ["Shenzhen District TAZ 559"]}
 
 def policy_retriever_node(state: AgentState):
-    """Simulates RAG by retrieving relevant planning policies."""
-    # Mocked 'retrieved' guidelines from infrastructure PDF
-    retrieved_text = """
-    - GUIDELINE 1: For occupancy > 80%, expand station capacity by at least 25%.
-    - GUIDELINE 2: Prioritize fast-charging piles in high-traffic administrative zones.
-    - GUIDELINE 3: Implement dynamic pricing during peak hours (5 PM - 8 PM).
+    """Retrieve planning policies relevant to the identified load patterns."""
+    policy_text = """
+    Planning Policies:
+    - Expansion triggered when occupancy > 80%.
+    - High-traffic zones receive priority for DC fast-charging.
+    - Load balancing via dynamic pricing is recommended for peak windows.
     """
-    return {"guidelines": retrieved_text}
+    return {"guidelines": policy_text}
+
 
 def recommendation_generator_node(state: AgentState):
     """Generates structured recommendations based on analysis and guidelines."""

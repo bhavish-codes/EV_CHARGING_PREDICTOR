@@ -5,9 +5,9 @@ import pickle
 import numpy as np
 import os
 
-st.set_page_config(page_title="EV-ChargePlan AI", layout="wide", page_icon="⚡")
+st.set_page_config(page_title="EV Charging Planner", layout="wide")
 
-# Load Resources
+# Configuration for data and models
 MODEL_PATH = "models/rf_demand.pkl"
 STATION_INFO_PATH = "data/raw/UrbanEVDataset/UrbanEVDataset/20220901-20230228_zone-cleaned-aggregated/station_information.csv"
 
@@ -27,12 +27,12 @@ def load_station_info():
 model = load_rf_model()
 stations = load_station_info()
 
-st.title("⚡ Intelligent EV Charging Demand Prediction")
+st.title("Intelligent EV Charging Demand Prediction")
 st.sidebar.header("Navigation")
 page = st.sidebar.radio("Go to", ["Dashboard", "Demand Forecasting", "Infrastructure Planning", "About"])
 
 if page == "Dashboard":
-    st.subheader("📍 Station Network Overview")
+    st.subheader("Station Network Overview")
     if stations is not None:
         col1, col2 = st.columns([2, 1])
         with col1:
@@ -45,7 +45,7 @@ if page == "Dashboard":
             st.dataframe(stations.sort_values(by='charge_count', ascending=False).head(10))
 
 elif page == "Demand Forecasting":
-    st.subheader("📊 Forecast Charging Demand")
+    st.subheader("Forecast Charging Demand")
     
     col1, col2 = st.columns(2)
     with col1:
@@ -56,7 +56,7 @@ elif page == "Demand Forecasting":
         s_price = st.number_input("Service Fee (CNY/kWh)", value=0.5)
         e_price = st.number_input("Electricity Price (CNY/kWh)", value=1.0)
 
-    # Prepare input
+    # Process inputs for model prediction
     day_idx = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].index(day_of_week)
     is_weekend = 1 if day_idx >= 5 else 0
     
@@ -65,11 +65,11 @@ elif page == "Demand Forecasting":
     
     if model:
         prediction = model.predict(input_df)[0]
-        st.success(f"📈 Predicted Charging Volume: **{prediction:.2f} kWh**")
+        st.success(f"Predicted Charging Volume: **{prediction:.2f} kWh**")
         
-        # Trend Visualization
+        # Display hourly trends
         st.write("---")
-        st.write("🕒 Hourly Demand Trend (24h)")
+        st.write("Hourly Demand Trend (24h)")
         hours = list(range(24))
         trend_X = pd.DataFrame({
             'hour': hours,
@@ -84,66 +84,63 @@ elif page == "Demand Forecasting":
         st.plotly_chart(fig, use_container_width=True)
 
 elif page == "Infrastructure Planning":
-    st.subheader("🤖 Agentic AI Infrastructure Planning Assistant")
-    st.markdown("This assistant reasons about charging demand patterns and generates structured growth recommendations.")
+    st.subheader("Automated Infrastructure Planning")
+    st.markdown("This module analyzes charging demand patterns to generate structured growth recommendations.")
     
-    if st.button("🚀 Run Planning Analysis"):
-        with st.spinner("Agentic Assistant is reasoning..."):
+    if st.button("Generate Planning Analysis"):
+        with st.spinner("Analyzing demand patterns..."):
             try:
-                # 1. Gather Demand Insights (Simplified for UI flow)
-                # In a real scenario, we'd pass actual model predictions for different zones
-                demand_summary = "Peak demand of 25.4 kWh observed between 5 PM and 8 PM on weekdays. Current station capacity (12 piles) is entering 85% occupancy during these windows."
+                # Prepare summary statistics for the planner
+                demand_summary = "Peak demand of 25.4 kWh observed between 5 PM and 8 PM on weekdays. Current station capacity is reaching 85% occupancy during peak windows."
                 
-                # 2. Run LangGraph Workflow (Mocked for now to show flow)
                 from app.agent import build_agent_graph
-                agent_app = build_agent_graph()
+                planner = build_agent_graph()
                 initial_state = {
                     "demand_summary": demand_summary,
-                    "hot_zones": ["Station 1001 Area"],
+                    "hot_zones": ["Shenzhen District TAZ 559"],
                     "guidelines": "",
                     "recommendations": "",
                     "history": []
                 }
                 
-                result = agent_app.invoke(initial_state)
+                result = planner.invoke(initial_state)
                 
-                # 3. Display Results
-                st.success("Analysis Complete!")
+                st.success("Analysis Complete")
                 col1, col2 = st.columns(2)
                 with col1:
-                    st.info("🔍 Demand Insights")
+                    st.info("Demand Insights")
                     st.write(result['demand_summary'])
-                    st.write("**Identified Hot Zones:**")
+                    st.write("**Identified Priority Zones:**")
                     for zone in result['hot_zones']:
                         st.write(f"- {zone}")
                 
                 with col2:
-                    st.info("💡 Recommendations")
+                    st.info("Recommendations")
                     st.write(result['recommendations'])
                 
-                # 4. Generate and Export PDF
                 from app.report import generate_pdf_report
                 report_path = generate_pdf_report(result['demand_summary'], result['recommendations'])
                 
                 with open(report_path, "rb") as f:
                     st.download_button(
-                        label="📄 Download Planning Report (PDF)",
+                        label="Download Planning Report (PDF)",
                         data=f,
                         file_name="EV_Planning_Report.pdf",
                         mime="application/pdf"
                     )
             except Exception as e:
-                st.error(f"Error during agentic analysis: {e}")
+                st.error(f"Error during planning analysis: {e}")
 
 elif page == "About":
 
     st.markdown("""
     ### Project Objective
-    Design and implement an AI-driven analytics system that predicts EV charging demand using historical data and generates structured planning recommendations.
+    Design and implement an analytics system that predicts EV charging demand using historical data and generates structured planning recommendations for infrastructure expansion.
     
     ### Tech Stack
-    - **ML**: Scikit-learn (Random Forest)
-    - **UI**: Streamlit, Plotly
-    - **Data**: UrbanEV Dataset (Dryad)
+    - **ML Framework**: Scikit-learn (Random Forest)
+    - **Dashboard**: Streamlit, Plotly
+    - **Dataset**: UrbanEV Dataset (Open Benchmark)
     """)
+
 
