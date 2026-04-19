@@ -2,10 +2,11 @@ pandas
 numpy
 scikit-learn
 xgboost
-streamlit>=1.31.0
-altair<5
+streamlit
+altair
 plotly
 pydeck
 statsmodels
 python-dotenv
 requests
+groq

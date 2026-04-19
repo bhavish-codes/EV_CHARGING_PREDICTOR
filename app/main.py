@@ -4,12 +4,16 @@ import plotly.express as px
 import pickle
 import numpy as np
 import os
+import requests
+import json
+from groq import Groq
 
 st.set_page_config(page_title="EV Charging Planner", layout="wide")
 
-# Configuration for data and models
-MODEL_PATH = "models/rf_demand.pkl"
-STATION_INFO_PATH = "data/raw/UrbanEVDataset/UrbanEVDataset/20220901-20230228_zone-cleaned-aggregated/station_information.csv"
+# Configuration for data and models relative to script location
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(BASE_DIR, "..", "models", "rf_demand.pkl")
+STATION_INFO_PATH = os.path.join(BASE_DIR, "..", "data", "raw", "UrbanEVDataset", "UrbanEVDataset", "20220901-20230228_zone-cleaned-aggregated", "station_information.csv")
 
 @st.cache_resource
 def load_rf_model():
@@ -29,7 +33,7 @@ stations = load_station_info()
 
 st.title("Intelligent EV Charging Demand Prediction")
 st.sidebar.header("Navigation")
-page = st.sidebar.radio("Go to", ["Dashboard", "Demand Forecasting", "About"])
+page = st.sidebar.radio("Go to", ["Dashboard", "Demand Forecasting", "AI Infrastructure Planner", "Ask AI", "About"])
 
 if page == "Dashboard":
     st.subheader("Station Network Overview")
@@ -82,6 +86,159 @@ elif page == "Demand Forecasting":
         fig = px.line(x=hours, y=trend_preds, labels={'x': 'Hour of Day', 'y': 'Predicted Demand (kWh)'}, 
                      title=f"Predicted Demand Cycle for {day_of_week}")
         st.plotly_chart(fig, use_container_width=True)
+
+elif page == "AI Infrastructure Planner":
+    st.subheader("AI-Driven Infrastructure Recommendation")
+    
+    st.write("Generate intelligent recommendations for infrastructure planning using a HuggingFace LLM.")
+    
+    hf_token = st.text_input("Enter HuggingFace API Token (or leave blank if set in ENV):", type="password")
+    token = hf_token if hf_token else os.getenv("HUGGINGFACE_API_KEY", "")
+
+    if st.button("Generate Planning Report"):
+        if not token:
+            st.error("Please provide a HuggingFace API Token.")
+        else:
+            with st.spinner("Analyzing demand patterns and communicating with LLM..."):
+                try:
+                    # Construct Data Summary
+                    summary = ""
+                    if stations is not None:
+                        total_stations = len(stations)
+                        total_piles = stations['charge_count'].sum()
+                        avg_piles = stations['charge_count'].mean()
+                        top_stations = stations.sort_values(by='charge_count', ascending=False).head(3)['station_id'].tolist()
+                        
+                        summary = f"Total Stations: {total_stations}. Total Charging Piles: {total_piles}. Average Piles per Station: {avg_piles:.1f}. High-capacity stations (Top 3 IDs): {top_stations}."
+                    
+                    # We create a generic prompt for the LLM
+                    prompt = f"""<|system|>
+You are an expert AI urban infrastructure planner. 
+Based on the following data analysis of an EV charging network, please provide a structured recommendation report.
+
+Network Analysis:
+{summary}
+
+Please provide your output exactly with these 4 sections:
+1. Demand Summary
+2. High-load Locations
+3. Suggestions for New Charging Stations
+4. Load Balancing Recommendations</s>
+<|user|>
+Generate the planning report.</s>
+<|assistant|>
+"""
+                    
+                    API_URL = "https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta"
+                    headers = {"Authorization": f"Bearer {token}"}
+                    payload = {"inputs": prompt, "parameters": {"max_new_tokens": 512, "temperature": 0.3}}
+                    
+                    response = requests.post(API_URL, headers=headers, json=payload)
+                    
+                    if response.status_code == 200:
+                        output = response.json()
+                        generated_text = output[0].get("generated_text", "")
+                        # Remove the prompt from output if present
+                        if "<|assistant|>" in generated_text:
+                            generated_text = generated_text.split("<|assistant|>")[-1].strip()
+                        st.success("Report Generated Successfully!")
+                        st.markdown(generated_text)
+                    else:
+                        st.error(f"Error from HuggingFace API: {response.status_code} - {response.text}")
+                except Exception as e:
+                    st.error(f"An error occurred: {e}")
+
+elif page == "Ask AI":
+    st.subheader("💬 Ask AI about the Dataset")
+    
+    st.write("Query the EV charging dataset using natural language via Groq Cloud.")
+    
+    # Initialize Groq Client
+    groq_api_key = st.text_input("Enter Groq API Key (or set in ENV):", type="password")
+    api_key = groq_api_key if groq_api_key else os.getenv("GROQ_API_KEY", "")
+    
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+    # Sidebar clear button for chat
+    if st.sidebar.button("Clear Chat History"):
+        st.session_state.messages = []
+        st.rerun()
+
+    # Data Context Preparation
+    def get_context():
+        if stations is None:
+            return "No dataset loaded."
+        
+        stats = stations['charge_count'].describe()
+        top_10 = stations.sort_values(by='charge_count', ascending=False).head(10)
+        
+        context = f"""
+        EV CHARGING DATASET CONTEXT:
+        - Total Stations: {len(stations)}
+        - Total Charging Piles: {stations['charge_count'].sum()}
+        - Avg Piles per Station: {stats['mean']:.2f}
+        - Max Piles at a single station: {stats['max']}
+        - Top 10 Stations by Capacity: 
+        {top_10[['station_id', 'charge_count']].to_string(index=False)}
+        
+        The dataset includes station_id, longitude, latitude, and charge_count.
+        """
+        return context
+
+    # Display chat history
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    # Chat Input
+    if prompt := st.chat_input("Ask something about the charging stations..."):
+        if not api_key:
+            st.error("Please provide a Groq API Key.")
+        else:
+            # Add user message to history
+            st.session_state.messages.append({"role": "user", "content": prompt})
+            with st.chat_message("user"):
+                st.markdown(prompt)
+
+            with st.chat_message("assistant"):
+                message_placeholder = st.empty()
+                full_response = ""
+                
+                try:
+                    client = Groq(api_key=api_key)
+                    
+                    data_context = get_context()
+                    
+                    system_prompt = f"""
+                    You are an assistant specialized in analyzed EV charging data.
+                    You have access to the following dataset summary:
+                    {data_context}
+                    
+                    Answer the user's questions accurately based on this data. If you don't know the answer, say so.
+                    """
+                    
+                    # Prepare messages for API
+                    api_messages = [{"role": "system", "content": system_prompt}] + [
+                        {"role": m["role"], "content": m["content"]} for m in st.session_state.messages
+                    ]
+                    
+                    completion = client.chat.completions.create(
+                        model="llama-3-70b-8192",
+                        messages=api_messages,
+                        temperature=0.3,
+                        max_tokens=1024,
+                        stream=False
+                    )
+                    
+                    full_response = completion.choices[0].message.content
+                    message_placeholder.markdown(full_response)
+                    
+                    # Add assistant response to history
+                    st.session_state.messages.append({"role": "assistant", "content": full_response})
+                    
+                except Exception as e:
+                    st.error(f"Groq API Error: {e}")
 
 elif page == "About":
 

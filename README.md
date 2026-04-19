@@ -58,6 +58,13 @@ By default, the application will be accessible at:
 - **Local URL**: http://localhost:8501
 - **Network URL**: http://your-ip-address:8501
 
+### AI Infrastructure Planner
+To use the AI Infrastructure Planner feature, you will need a free Hugging Face API Token. 
+You can enter this directly in the app UI, or set it as an environment variable before running:
+```bash
+export HUGGINGFACE_API_KEY="your_api_token"
+```
+
 ## Methodology
 - **Model**: Random Forest Regressor trained on seasonal charging patterns.
 - **Planner**: Automated decision-making based on occupancy thresholds and urban planning guidelines.

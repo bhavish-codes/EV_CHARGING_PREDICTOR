@@ -1,77 +1,77 @@
 import os
+import sys
+import logging
 import pandas as pd
-import numpy as np
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_absolute_error, mean_squared_error
-import pickle
 
-# Configuration
+# Directly import the unified structural pipeline rather than reinventing it here
+from app.preprocess import process_station_pipeline
+from app.model import train_demand_model, save_model
+
+# Establish production-grade console logger
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] %(levelname)s - %(message)s',
+    datefmt='%H:%M:%S'
+)
+logger = logging.getLogger(__name__)
+
+# Configuration Constants
 DATA_DIR = "data/raw/UrbanEVDataset/UrbanEVDataset/20220901-20230228_station-raw/charge_5min"
 STATIONS_TO_TRAIN = ["1001.csv", "1002.csv", "1003.csv", "1006.csv", "1008.csv"]
 MODEL_PATH = "models/rf_demand.pkl"
 
-def aggregate_and_engineer(df):
-    """Clean and prepare features."""
-    df['time'] = pd.to_datetime(df['time'])
-    df.set_index('time', inplace=True)
-    
-    # Aggregate to hourly
-    hourly = df.resample('H').agg({
-        'busy': 'mean',
-        'volume': 'sum',
-        's_price': 'mean',
-        'e_price': 'mean'
-    }).reset_index()
-    
-    # Time features
-    hourly['hour'] = hourly['time'].dt.hour
-    hourly['day_of_week'] = hourly['time'].dt.dayofweek
-    hourly['is_weekend'] = hourly['day_of_week'].isin([5, 6]).astype(int)
-    
-    # Target is 'volume' (demand)
-    return hourly.dropna()
-
-def train():
+def main():
+    logger.info("Initializing EV Demand Model Training Pipeline...")
     all_data = []
-    print(f"Loading data for stations: {STATIONS_TO_TRAIN}")
-    for station_file in STATIONS_TO_TRAIN:
-        path = os.path.join(DATA_DIR, station_file)
-        if os.path.exists(path):
-            df = pd.read_csv(path)
-            processed_df = aggregate_and_engineer(df)
+    
+    # 1. Ingest & Engineer Data Space
+    for station_filename in STATIONS_TO_TRAIN:
+        path = os.path.join(DATA_DIR, station_filename)
+        if not os.path.exists(path):
+            logger.warning(f"Target dataset {station_filename} skipped (File not found).")
+            continue
+            
+        try:
+            # Leverage our newly refactored, robust engineering pipeline
+            processed_df = process_station_pipeline(path)
             all_data.append(processed_df)
-    
+            logger.info(f"Successfully digested {len(processed_df)} hourly shards from {station_filename}")
+        except Exception as e:
+            logger.error(f"Failed to process {station_filename} due to data corruption/schema mismatch. Err: {e}")
+
     if not all_data:
-        print("No data found to train on.")
-        return
+        logger.critical("Pipeline aborted. Zero datasets successfully loaded.")
+        sys.exit(1)
 
+    # Compile the ultimate master table
     full_df = pd.concat(all_data, ignore_index=True)
+    logger.info(f"Unified dataset compiled. Absolute row count: {len(full_df)}")
     
-    # Features: Hour, Day, Weekend Flag, and Pricing Metrics
-    X = full_df[['hour', 'day_of_week', 'is_weekend', 's_price', 'e_price']]
-    y = full_df['volume']
+    # 2. Extract Vectors
+    # Note: We now utilize the cyclical time features to respect physical clock boundaries
+    target = 'volume'
+    features = ['hour_sin', 'hour_cos', 'day_of_week', 'is_weekend', 's_price', 'e_price']
     
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    # Validate feature integrity before model fit
+    missing_cols = [f for f in features if f not in full_df.columns]
+    if missing_cols:
+        logger.critical(f"Dataframe missing engineered features necessary for prediction: {missing_cols}")
+        sys.exit(1)
+        
+    X = full_df[features]
+    y = full_df[target]
     
-    print("Fitting Random Forest Regressor...")
-    model = RandomForestRegressor(n_estimators=100, max_depth=10, random_state=42)
-    model.fit(X_train, y_train)
+    # 3. Fit & Evaluate
+    logger.info("Engaging Random Forest Regressor architecture...")
+    model, metrics = train_demand_model(X, y)
     
-    # Run evaluation metrics
-    preds = model.predict(X_test)
-    mae = mean_absolute_error(y_test, preds)
-    rmse = np.sqrt(mean_squared_error(y_test, preds))
+    logger.info("--- Model Efficacy Report ---")
+    logger.info(f"Mean Absolute Error : {metrics['MAE']:.3f} kWh")
+    logger.info(f"Root Mean Sq. Error : {metrics['RMSE']:.3f} kWh")
+    logger.info(f"Validation Sample Sz: {metrics['Test_Samples']}")
     
-    print(f"Training complete. MAE: {mae:.2f}, RMSE: {rmse:.2f}")
-    
-    # Export model to disk
-    os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
-    with open(MODEL_PATH, "wb") as f:
-        pickle.dump(model, f)
-    print(f"Model exported to {MODEL_PATH}")
-
-
+    # 4. Export Artifact
+    save_model(model, metrics, MODEL_PATH)
 
 if __name__ == "__main__":
-    train()
+    main()
