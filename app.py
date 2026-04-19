@@ -9,13 +9,13 @@ import json
 from groq import Groq
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+# Configuration and environment loading
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 st.set_page_config(page_title="EV Charging Planner", layout="wide")
 
 # Configuration for data and models (Root level)
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "models", "rf_demand.pkl")
 STATION_INFO_PATH = os.path.join(BASE_DIR, "data", "raw", "UrbanEVDataset", "UrbanEVDataset", "20220901-20230228_zone-cleaned-aggregated", "station_information.csv")
 
