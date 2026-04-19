@@ -100,8 +100,8 @@ elif page == "AI Infrastructure Planner":
     
     st.write("Generate intelligent recommendations for infrastructure planning using a HuggingFace LLM.")
     
-    # Using environment variables for deployment
-    token = os.getenv("HUGGINGFACE_API_KEY", "")
+    # Using environment variables or Streamlit secrets for deployment
+    token = os.getenv("HUGGINGFACE_API_KEY") or st.secrets.get("HUGGINGFACE_API_KEY", "")
 
     if st.button("Generate Planning Report"):
         if not token:
@@ -162,8 +162,8 @@ elif page == "Ask AI":
     st.write("Query the EV charging dataset using natural language via Groq Cloud.")
     
     # Initialize Groq Client
-    # Using environment variables for Groq
-    api_key = os.getenv("GROQ_API_KEY", "")
+    # Using environment variables or Streamlit secrets for Groq
+    api_key = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY", "")
     
     if "messages" not in st.session_state:
         st.session_state.messages = []
