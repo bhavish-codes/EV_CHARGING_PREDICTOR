@@ -1,250 +1,257 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import joblib
 import plotly.express as px
-from datetime import datetime
+import pickle
+import numpy as np
+import os
+import requests
+import json
+from groq import Groq
 
-# === Page Configuration (must be the first Streamlit command) ===
-st.set_page_config(
-    page_title="EV Adoption Forecaster",
-    page_icon="⚡️",
-    layout="wide"
-)
+st.set_page_config(page_title="EV Charging Planner", layout="wide")
 
-# === New "Professional Dark" Theming via CSS ===
-st.markdown("""
-    <style>
-        /* Main app background */
-        .stApp {
-            background-color: #0E1117; /* Dark background */
-        }
+# Configuration for data and models (Root level)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(BASE_DIR, "models", "rf_demand.pkl")
+STATION_INFO_PATH = os.path.join(BASE_DIR, "data", "raw", "UrbanEVDataset", "UrbanEVDataset", "20220901-20230228_zone-cleaned-aggregated", "station_information.csv")
 
-        /* Sidebar styling */
-        .css-1d391kg {
-            background-color: #161B22; /* Slightly lighter dark for sidebar */
-        }
+@st.cache_resource
+def load_rf_model():
+    if os.path.exists(MODEL_PATH):
+        try:
+            with open(MODEL_PATH, "rb") as f:
+                return pickle.load(f)
+        except Exception as e:
+            st.error(f"Model loading failed: {e}")
+            raise e
+    return None
 
-        /* Font colors */
-        body, .stTextInput, .stSelectbox, .stMultiselect, .stNumberInput {
-            color: #FAFAFA; /* Light gray for text */
-        }
-
-        /* Title and header colors */
-        h1, h2, h3 {
-            color: #3B82F6; /* A bright, professional blue */
-        }
-        
-        /* Metric styling for a "card" look */
-        .stMetric {
-            background-color: #161B22;
-            border: 1px solid #30363D;
-            border-radius: 10px;
-            padding: 15px;
-        }
-
-        /* Removing the default top padding for the main block container */
-        .block-container {
-            padding-top: 2rem;
-        }
-
-    </style>
-""", unsafe_allow_html=True)
-
-
-# === Model and Data Loading (with caching) ===
 @st.cache_data
-def load_data_and_model():
-    """Loads the preprocessed data and the forecasting model."""
-    df = pd.read_csv("preprocessed_ev_data.csv")
-    df['Date'] = pd.to_datetime(df['Date'])
-    model = joblib.load('forecasting_ev_model.pkl')
-    return df, model
+def load_station_info():
+    if os.path.exists(STATION_INFO_PATH):
+        return pd.read_csv(STATION_INFO_PATH)
+    return None
 
-df, model = load_data_and_model()
-county_list = sorted(df['County'].dropna().unique().tolist())
-FORECAST_HORIZON = 36 # 3 years
+model = load_rf_model()
+stations = load_station_info()
 
-# === Core Forecasting Logic (Refactored into a function) ===
-def generate_forecast(county_df, model, forecast_horizon):
-    """
-    Generates an EV adoption forecast for a given county.
+st.title("Intelligent EV Charging Demand Prediction")
+st.sidebar.header("Navigation")
+page = st.sidebar.radio("Go to", ["Dashboard", "Demand Forecasting", "AI Infrastructure Planner", "Ask AI", "About"])
+
+if page == "Dashboard":
+    st.subheader("Station Network Overview")
+    if stations is not None:
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            st.map(stations, latitude="latitude", longitude="longitude")
+        with col2:
+            st.metric("Total Stations", len(stations))
+            avg_piles = stations['charge_count'].mean()
+            st.metric("Avg Piles / Station", f"{avg_piles:.1f}")
+            st.write("Top Stations by Capacity:")
+            st.dataframe(stations.sort_values(by='charge_count', ascending=False).head(10))
+
+elif page == "Demand Forecasting":
+    st.subheader("Forecast Charging Demand")
     
-    Args:
-        county_df (pd.DataFrame): The historical data for a single county.
-        model: The trained forecasting model.
-        forecast_horizon (int): Number of months to forecast into the future.
+    col1, col2 = st.columns(2)
+    with col1:
+        hour = st.slider("Select Hour of Day", 0, 23, 12)
+        day_of_week = st.selectbox("Select Day of Week", ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"])
+    
+    with col2:
+        s_price = st.number_input("Service Fee (CNY/kWh)", value=0.5)
+        e_price = st.number_input("Electricity Price (CNY/kWh)", value=1.0)
 
-    Returns:
-        pd.DataFrame: A dataframe containing both historical and forecasted cumulative EV counts.
-    """
-    # Initialize variables from the last available data
-    historical_ev = list(county_df['Electric Vehicle (EV) Total'].values[-6:])
-    cumulative_ev = list(np.cumsum(historical_ev))
-    months_since_start = county_df['months_since_start'].max()
-    latest_date = county_df['Date'].max()
-
-    future_predictions = []
-
-    # Iteratively predict for each future month
-    for i in range(1, forecast_horizon + 1):
-        # Create features for the model
-        lag1, lag2, lag3 = historical_ev[-1], historical_ev[-2], historical_ev[-3]
-        roll_mean = np.mean([lag1, lag2, lag3])
-        pct_change_1 = (lag1 - lag2) / lag2 if lag2 != 0 else 0
-        pct_change_3 = (lag1 - lag3) / lag3 if lag3 != 0 else 0
-        recent_cumulative = cumulative_ev[-6:]
-        ev_growth_slope = np.polyfit(range(len(recent_cumulative)), recent_cumulative, 1)[0] if len(recent_cumulative) == 6 else 0
+    # Process inputs for model prediction
+    day_idx = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].index(day_of_week)
+    is_weekend = 1 if day_idx >= 5 else 0
+    
+    input_df = pd.DataFrame([[hour, day_idx, is_weekend, s_price, e_price]], 
+                           columns=['hour', 'day_of_week', 'is_weekend', 's_price', 'e_price'])
+    
+    if model:
+        prediction = model.predict(input_df)[0]
+        st.success(f"Predicted Charging Volume: **{prediction:.2f} kWh**")
         
-        feature_row = {
-            'months_since_start': months_since_start + i,
-            'county_encoded': county_df['county_encoded'].iloc[0],
-            'ev_total_lag1': lag1, 'ev_total_lag2': lag2, 'ev_total_lag3': lag3,
-            'ev_total_roll_mean_3': roll_mean, 'ev_total_pct_change_1': pct_change_1,
-            'ev_total_pct_change_3': pct_change_3, 'ev_growth_slope': ev_growth_slope
-        }
-
-        # Predict and store the result
-        prediction = model.predict(pd.DataFrame([feature_row]))[0]
-        forecast_date = latest_date + pd.DateOffset(months=i)
-        future_predictions.append({"Date": forecast_date, "Predicted EV Total": round(prediction)})
-
-        # Update the history for the next iteration's feature engineering
-        historical_ev.append(prediction)
-        historical_ev.pop(0)
-        cumulative_ev.append(cumulative_ev[-1] + prediction)
-        cumulative_ev.pop(0)
-
-    # Combine historical and forecasted data for plotting
-    historical_cum = county_df[['Date', 'Electric Vehicle (EV) Total']].copy()
-    historical_cum['Source'] = 'Historical'
-    historical_cum['Cumulative EV'] = historical_cum['Electric Vehicle (EV) Total'].cumsum()
-
-    forecast_df = pd.DataFrame(future_predictions)
-    forecast_df['Source'] = 'Forecast'
-    forecast_df['Cumulative EV'] = forecast_df['Predicted EV Total'].cumsum() + (historical_cum['Cumulative EV'].iloc[-1] if not historical_cum.empty else 0)
-
-    return pd.concat([historical_cum, forecast_df], ignore_index=True)
-
-
-# === Sidebar for User Inputs ===
-st.sidebar.title("⚙️ Controls")
-st.sidebar.markdown("Select an analysis mode and choose the counties to forecast.")
-
-# App mode selection
-app_mode = st.sidebar.selectbox("Choose Mode", ["Single County Forecast", "Compare Counties"])
-
-
-# === Main Panel Display ===
-st.markdown("<h1 style='text-align: center;'>Electric Vehicle Adoption Forecaster</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #D1D5DB;'>Analyzing EV trends in the State of Washington</p>", unsafe_allow_html=True)
-st.image("professional_background.jpg", use_container_width=True) # Recommended to find a new professional/clean image
-
-
-# === Single County Forecast Mode ===
-if app_mode == "Single County Forecast":
-    st.header("Single County Deep Dive")
-
-    # New robust code
-    # This block determines the default county to show
-    default_index = 0  # Default to the first county in the list
-    if "King" in county_list:
-        default_index = county_list.index("King")
-
-    # The selectbox should be in the sidebar, but controlled by this logic block
-    county = st.sidebar.selectbox("Select a County", county_list, index=default_index)
-
-    # This block runs only after a county has been selected
-    if county:
-        county_df = df[df['County'] == county].sort_values("Date")
-        combined_df = generate_forecast(county_df, model, FORECAST_HORIZON)
-        
-        # --- Metrics and Plot Display ---
-        st.subheader(f"📈 3-Year Forecast for {county} County")
-        col1, col2, col3 = st.columns(3)
-        
-        historical_total = combined_df[combined_df['Source'] == 'Historical']['Cumulative EV'].iloc[-1]
-        forecasted_total = combined_df['Cumulative EV'].iloc[-1]
-        growth_pct = ((forecasted_total - historical_total) / historical_total) * 100 if historical_total > 0 else 0
-        
-        col1.metric(label="Current Cumulative EVs", value=f"{int(historical_total):,}")
-        col2.metric(label="Forecasted EVs (in 3 Yrs)", value=f"{int(forecasted_total):,}")
-        col3.metric(label="Projected Growth", value=f"{growth_pct:.2f}%")
-
-        st.markdown("---")
-        
-        # --- Plotly Chart ---
-        fig = px.line(combined_df, x='Date', y='Cumulative EV', color='Source',
-                      title=f"Historical vs. Forecasted EV Adoption in {county}",
-                      labels={'Cumulative EV': 'Cumulative EV Count', 'Date': 'Date'},
-                      color_discrete_map={'Historical': '#3B82F6', 'Forecast': '#F97316'}, # Blue for historical, orange for forecast
-                      markers=True)
-        
-        fig.update_layout(
-            plot_bgcolor='#161B22', paper_bgcolor='#161B22', font_color='#FAFAFA',
-            legend_title_text='', legend=dict(x=0.01, y=0.98),
-            xaxis=dict(gridcolor='#30363D'),
-            yaxis=dict(gridcolor='#30363D'),
-        )
-        st.plotly_chart(fig, use_container_width=True)
-        
-# === Compare Counties Mode ===
-if app_mode == "Compare Counties":
-    st.header("County Comparison")
-    # New robust code
-    # Define the list of counties you would ideally like to be the default
-    ideal_defaults = ["King", "Snohomish", "Pierce"]
-
-    # Create a new list containing only the ideal defaults that actually exist in your county_list
-    valid_defaults = [county for county in ideal_defaults if county in county_list]
-
-    # Use this "safe" list as the default for the widget
-    multi_counties = st.sidebar.multiselect(
-        "Select up to 3 counties",
-        county_list,
-        default=valid_defaults,
-        max_selections=3
-    )
-
-    if multi_counties:
-        comparison_data = []
-        growth_summaries = {}
-        
-        for cty in multi_counties:
-            cty_df = df[df['County'] == cty].sort_values("Date")
-            combined_cty_df = generate_forecast(cty_df, model, FORECAST_HORIZON)
-            combined_cty_df['County'] = cty
-            comparison_data.append(combined_cty_df)
-
-            # Calculate growth for summary
-            hist_total = combined_cty_df[combined_cty_df['Source'] == 'Historical']['Cumulative EV'].iloc[-1]
-            fc_total = combined_cty_df['Cumulative EV'].iloc[-1]
-            growth_pct = ((fc_total - hist_total) / hist_total) * 100 if hist_total > 0 else 0
-            growth_summaries[cty] = f"{growth_pct:.2f}%"
-
-        comp_df = pd.concat(comparison_data, ignore_index=True)
-        
-        # --- Plot and Summary ---
-        st.subheader("📊 Comparison of Cumulative EV Adoption Trends")
-        fig = px.line(comp_df, x='Date', y='Cumulative EV', color='County',
-                      title="EV Adoption Trends: Historical + 3-Year Forecast",
-                      labels={'Cumulative EV': 'Cumulative EV Count', 'Date': 'Date'},
-                      color_discrete_sequence=px.colors.qualitative.Vivid, # A color sequence that works well on dark
-                      markers=False)
-        
-        fig.update_layout(
-            plot_bgcolor='#161B22', paper_bgcolor='#161B22', font_color='#FAFAFA',
-            legend_title_text='County',
-            xaxis=dict(gridcolor='#30363D'),
-            yaxis=dict(gridcolor='#30363D'),
-        )
+        # Display hourly trends
+        st.write("---")
+        st.write("Hourly Demand Trend (24h)")
+        hours = list(range(24))
+        trend_X = pd.DataFrame({
+            'hour': hours,
+            'day_of_week': [day_idx]*24,
+            'is_weekend': [is_weekend]*24,
+            's_price': [s_price]*24,
+            'e_price': [e_price]*24
+        })
+        trend_preds = model.predict(trend_X)
+        fig = px.line(x=hours, y=trend_preds, labels={'x': 'Hour of Day', 'y': 'Predicted Demand (kWh)'}, 
+                     title=f"Predicted Demand Cycle for {day_of_week}")
         st.plotly_chart(fig, use_container_width=True)
 
-        st.subheader("Forecasted Growth Summary")
-        with st.expander("Click to see the 3-year forecasted growth for each county"):
-            for county, growth in growth_summaries.items():
-                st.markdown(f"- **{county}:** {growth}")
+elif page == "AI Infrastructure Planner":
+    st.subheader("AI-Driven Infrastructure Recommendation")
+    
+    st.write("Generate intelligent recommendations for infrastructure planning using a HuggingFace LLM.")
+    
+    hf_token = st.text_input("Enter HuggingFace API Token (or leave blank if set in ENV):", type="password")
+    token = hf_token if hf_token else os.getenv("HUGGINGFACE_API_KEY", "")
 
+    if st.button("Generate Planning Report"):
+        if not token:
+            st.error("Please provide a HuggingFace API Token.")
+        else:
+            with st.spinner("Analyzing demand patterns and communicating with LLM..."):
+                try:
+                    # Construct Data Summary
+                    summary = ""
+                    if stations is not None:
+                        total_stations = len(stations)
+                        total_piles = stations['charge_count'].sum()
+                        avg_piles = stations['charge_count'].mean()
+                        top_stations = stations.sort_values(by='charge_count', ascending=False).head(3)['station_id'].tolist()
+                        
+                        summary = f"Total Stations: {total_stations}. Total Charging Piles: {total_piles}. Average Piles per Station: {avg_piles:.1f}. High-capacity stations (Top 3 IDs): {top_stations}."
+                    
+                    # We create a generic prompt for the LLM
+                    prompt = f"""<|system|>
+You are an expert AI urban infrastructure planner. 
+Based on the following data analysis of an EV charging network, please provide a structured recommendation report.
 
-st.markdown("---")
-st.markdown("<p style='text-align: center; color: #888;'>Prepared for the AICTE Internship Cycle 2 by Shuban Borkar</p>", unsafe_allow_html=True)
+Network Analysis:
+{summary}
+
+Please provide your output exactly with these 4 sections:
+1. Demand Summary
+2. High-load Locations
+3. Suggestions for New Charging Stations
+4. Load Balancing Recommendations</s>
+<|user|>
+Generate the planning report.</s>
+<|assistant|>
+"""
+                    
+                    API_URL = "https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta"
+                    headers = {"Authorization": f"Bearer {token}"}
+                    payload = {"inputs": prompt, "parameters": {"max_new_tokens": 512, "temperature": 0.3}}
+                    
+                    response = requests.post(API_URL, headers=headers, json=payload)
+                    
+                    if response.status_code == 200:
+                        output = response.json()
+                        generated_text = output[0].get("generated_text", "")
+                        # Remove the prompt from output if present
+                        if "<|assistant|>" in generated_text:
+                            generated_text = generated_text.split("<|assistant|>")[-1].strip()
+                        st.success("Report Generated Successfully!")
+                        st.markdown(generated_text)
+                    else:
+                        st.error(f"Error from HuggingFace API: {response.status_code} - {response.text}")
+                except Exception as e:
+                    st.error(f"An error occurred: {e}")
+
+elif page == "Ask AI":
+    st.subheader("💬 Ask AI about the Dataset")
+    
+    st.write("Query the EV charging dataset using natural language via Groq Cloud.")
+    
+    # Initialize Groq Client
+    groq_api_key = st.text_input("Enter Groq API Key (or set in ENV):", type="password")
+    api_key = groq_api_key if groq_api_key else os.getenv("GROQ_API_KEY", "")
+    
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+    # Sidebar clear button for chat
+    if st.sidebar.button("Clear Chat History"):
+        st.session_state.messages = []
+        st.rerun()
+
+    # Data Context Preparation
+    def get_context():
+        if stations is None:
+            return "No dataset loaded."
+        
+        stats = stations['charge_count'].describe()
+        top_10 = stations.sort_values(by='charge_count', ascending=False).head(10)
+        
+        context = f"""
+        EV CHARGING DATASET CONTEXT:
+        - Total Stations: {len(stations)}
+        - Total Charging Piles: {stations['charge_count'].sum()}
+        - Avg Piles per Station: {stats['mean']:.2f}
+        - Max Piles at a single station: {stats['max']}
+        - Top 10 Stations by Capacity: 
+        {top_10[['station_id', 'charge_count']].to_string(index=False)}
+        
+        The dataset includes station_id, longitude, latitude, and charge_count.
+        """
+        return context
+
+    # Display chat history
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    # Chat Input
+    if prompt := st.chat_input("Ask something about the charging stations..."):
+        if not api_key:
+            st.error("Please provide a Groq API Key.")
+        else:
+            # Add user message to history
+            st.session_state.messages.append({"role": "user", "content": prompt})
+            with st.chat_message("user"):
+                st.markdown(prompt)
+
+            with st.chat_message("assistant"):
+                message_placeholder = st.empty()
+                full_response = ""
+                
+                try:
+                    client = Groq(api_key=api_key)
+                    
+                    data_context = get_context()
+                    
+                    system_prompt = f"""
+                    You are an assistant specialized in analyzed EV charging data.
+                    You have access to the following dataset summary:
+                    {data_context}
+                    
+                    Answer the user's questions accurately based on this data. If you don't know the answer, say so.
+                    """
+                    
+                    # Prepare messages for API
+                    api_messages = [{"role": "system", "content": system_prompt}] + [
+                        {"role": m["role"], "content": m["content"]} for m in st.session_state.messages
+                    ]
+                    
+                    completion = client.chat.completions.create(
+                        model="llama-3-70b-8192",
+                        messages=api_messages,
+                        temperature=0.3,
+                        max_tokens=1024,
+                        stream=False
+                    )
+                    
+                    full_response = completion.choices[0].message.content
+                    message_placeholder.markdown(full_response)
+                    
+                    # Add assistant response to history
+                    st.session_state.messages.append({"role": "assistant", "content": full_response})
+                    
+                except Exception as e:
+                    st.error(f"Groq API Error: {e}")
+
+elif page == "About":
+
+    st.markdown("""
+    ### Project Objective
+    Design and implement an analytics system that predicts EV charging demand using historical data.
+    
+    ### Tech Stack
+    - **ML Framework**: Scikit-learn (Random Forest)
+    - **Dashboard**: Streamlit, Plotly
+    - **Dataset**: UrbanEV Dataset (Open Benchmark)
+    """)
