@@ -7,6 +7,10 @@ import os
 import requests
 import json
 from groq import Groq
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 st.set_page_config(page_title="EV Charging Planner", layout="wide")
 
@@ -96,12 +100,12 @@ elif page == "AI Infrastructure Planner":
     
     st.write("Generate intelligent recommendations for infrastructure planning using a HuggingFace LLM.")
     
-    hf_token = st.text_input("Enter HuggingFace API Token (or leave blank if set in ENV):", type="password")
-    token = hf_token if hf_token else os.getenv("HUGGINGFACE_API_KEY", "")
+    # Using environment variables for deployment
+    token = os.getenv("HUGGINGFACE_API_KEY", "")
 
     if st.button("Generate Planning Report"):
         if not token:
-            st.error("Please provide a HuggingFace API Token.")
+            st.error("Missing HuggingFace API Key. Please set HUGGINGFACE_API_KEY in your environment or Streamlit Secrets.")
         else:
             with st.spinner("Analyzing demand patterns and communicating with LLM..."):
                 try:
@@ -158,8 +162,8 @@ elif page == "Ask AI":
     st.write("Query the EV charging dataset using natural language via Groq Cloud.")
     
     # Initialize Groq Client
-    groq_api_key = st.text_input("Enter Groq API Key (or set in ENV):", type="password")
-    api_key = groq_api_key if groq_api_key else os.getenv("GROQ_API_KEY", "")
+    # Using environment variables for Groq
+    api_key = os.getenv("GROQ_API_KEY", "")
     
     if "messages" not in st.session_state:
         st.session_state.messages = []
@@ -198,7 +202,7 @@ elif page == "Ask AI":
     # Chat Input
     if prompt := st.chat_input("Ask something about the charging stations..."):
         if not api_key:
-            st.error("Please provide a Groq API Key.")
+            st.error("Missing Groq API Key. Please set GROQ_API_KEY in your environment or Streamlit Secrets.")
         else:
             # Add user message to history
             st.session_state.messages.append({"role": "user", "content": prompt})
