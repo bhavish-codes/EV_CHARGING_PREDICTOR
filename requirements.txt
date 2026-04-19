@@ -1,8 +1,8 @@
+streamlit
 pandas
 numpy
 scikit-learn
 xgboost
-streamlit
 altair
 plotly
 pydeck
@@ -10,3 +10,4 @@ statsmodels
 python-dotenv
 requests
 groq
+joblib
