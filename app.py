@@ -6,6 +6,7 @@ import numpy as np
 import os
 import requests
 import json
+from huggingface_hub import InferenceClient
 from groq import Groq
 from dotenv import load_dotenv
 
@@ -120,39 +121,26 @@ elif page == "AI Infrastructure Planner":
                         summary = f"Total Stations: {total_stations}. Total Charging Piles: {total_piles}. Average Piles per Station: {avg_piles:.1f}. High-capacity stations (Top 3 IDs): {top_stations}."
                     
                     # We create a generic prompt for the LLM
-                    prompt = f"""<|system|>
-You are an expert AI urban infrastructure planner. 
-Based on the following data analysis of an EV charging network, please provide a structured recommendation report.
-
-Network Analysis:
-{summary}
-
-Please provide your output exactly with these 4 sections:
-1. Demand Summary
-2. High-load Locations
-3. Suggestions for New Charging Stations
-4. Load Balancing Recommendations</s>
-<|user|>
-Generate the planning report.</s>
-<|assistant|>
-"""
+                    client = InferenceClient("HuggingFaceH4/zephyr-7b-beta", token=token)
                     
-                    API_URL = "https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta"
-                    headers = {"Authorization": f"Bearer {token}"}
-                    payload = {"inputs": prompt, "parameters": {"max_new_tokens": 512, "temperature": 0.3}}
+                    messages = [
+                        {"role": "system", "content": "You are an expert AI urban infrastructure planner. Based on the following data analysis of an EV charging network, please provide a structured recommendation report. Please provide your output exactly with these 4 sections: 1. Demand Summary, 2. High-load Locations, 3. Suggestions for New Charging Stations, 4. Load Balancing Recommendations"},
+                        {"role": "user", "content": f"Network Analysis: {summary}\n\nGenerate the planning report."}
+                    ]
                     
-                    response = requests.post(API_URL, headers=headers, json=payload)
+                    response = client.chat_completion(
+                        messages,
+                        max_tokens=512,
+                        temperature=0.3
+                    )
                     
-                    if response.status_code == 200:
-                        output = response.json()
-                        generated_text = output[0].get("generated_text", "")
-                        # Remove the prompt from output if present
-                        if "<|assistant|>" in generated_text:
-                            generated_text = generated_text.split("<|assistant|>")[-1].strip()
+                    generated_text = response.choices[0].message.content
+                    
+                    if generated_text:
                         st.success("Report Generated Successfully!")
                         st.markdown(generated_text)
                     else:
-                        st.error(f"Error from HuggingFace API: {response.status_code} - {response.text}")
+                        st.error("HuggingFace API returned an empty response.")
                 except Exception as e:
                     st.error(f"An error occurred: {e}")
 
