@@ -128,19 +128,30 @@ elif page == "AI Infrastructure Planner":
                         {"role": "user", "content": f"Network Analysis: {summary}\n\nGenerate the planning report."}
                     ]
                     
-                    response = client.chat_completion(
-                        messages,
-                        max_tokens=512,
-                        temperature=0.3
-                    )
-                    
-                    generated_text = response.choices[0].message.content
-                    
-                    if generated_text:
-                        st.success("Report Generated Successfully!")
-                        st.markdown(generated_text)
-                    else:
-                        st.error("HuggingFace API returned an empty response.")
+                    try:
+                        response = client.chat_completion(
+                            messages,
+                            max_tokens=512,
+                            temperature=0.3
+                        )
+                        generated_text = response.choices[0].message.content
+                        if generated_text:
+                            st.success("Report Generated Successfully!")
+                            st.markdown(generated_text)
+                        else:
+                            st.error("HuggingFace API returned an empty response.")
+                    except Exception as e:
+                        error_msg = str(e)
+                        if "403" in error_msg or "permissions" in error_msg.lower():
+                            st.error("🔒 HuggingFace Permissions Error")
+                            st.info("Your token lacks the **'Make calls to Inference Providers'** permission. \n\n"
+                                    "**To fix this:** \n"
+                                    "1. Go to [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) \n"
+                                    "2. Create a **Fine-grained token** \n"
+                                    "3. Select **'Make calls to Inference Providers'** in the permissions list \n"
+                                    "4. Update the token in your app.")
+                        else:
+                            st.error(f"An error occurred: {e}")
                 except Exception as e:
                     st.error(f"An error occurred: {e}")
 
